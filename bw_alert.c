@@ -95,6 +95,8 @@ void monitor_bandwidth(const char *interface, int interval, double rxthr, double
     double rx_mbps;
     double tx_mbps;
     int health_ok = 1;
+    int bad_retries = 0;
+    int good_retries = 0;
 
     // Split comma-separated IPs into an array
     char *token;
@@ -123,13 +125,26 @@ void monitor_bandwidth(const char *interface, int interval, double rxthr, double
         // If bandwidth exceeds threshold, send alerts
         if (rx_mbps > rxthr || tx_mbps > txthr) {
             printf("Threshold exceeded! Sending alerts...\n");
-            for (int i = 0; i < ip_count; i++) {
-                send_alert(ip_addresses[i], host_address, 1);
+            good_retries = 0;
+            if (health_ok == 1) {
+              for (int i = 0; i < ip_count; i++) {
+                  send_alert(ip_addresses[i], host_address, 1);
+              }
+              bad_retries++;
             }
-            health_ok = 0;
+            if (bad_retries >= 2) {
+              health_ok = 0;
+              bad_retries = 0;
+            }
         } else if (!health_ok) {
+            bad_retries = 0;
             for (int i = 0; i < ip_count; i++) {
               send_alert(ip_addresses[i], host_address, 0);
+            }
+            good_retries++;
+            if (good_retries >= 2) {
+              health_ok = 1;
+              good_retries = 0;
             }
         }
 
